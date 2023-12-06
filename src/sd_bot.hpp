@@ -10,6 +10,7 @@
 #include <string>
 #include <memory>
 #include <optional>
+#include <random>
 
 // fwd
 struct ConfigModelI;
@@ -29,6 +30,8 @@ class SDBot : public RegistryMessageModelEventI {
 	std::optional<uint64_t> _current_task;
 	std::unique_ptr<happyhttp::Connection> _con;
 	std::vector<uint8_t> _con_data;
+
+	std::default_random_engine _rng;
 
 	public:
 		SDBot(
