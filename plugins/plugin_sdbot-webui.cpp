@@ -68,10 +68,10 @@ SOLANA_PLUGIN_EXPORT void solana_plugin_stop(void) {
 	g_sdbot.reset();
 }
 
-SOLANA_PLUGIN_EXPORT void solana_plugin_tick(float delta) {
+SOLANA_PLUGIN_EXPORT float solana_plugin_tick(float delta) {
 	(void)delta;
 	//std::cout << "PLUGIN SDB TICK()\n";
-	g_sdbot->iterate();
+	return g_sdbot->iterate();
 }
 
 } // extern C

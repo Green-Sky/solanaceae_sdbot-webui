@@ -41,7 +41,7 @@ class SDBot : public RegistryMessageModelEventI {
 		);
 		~SDBot(void);
 
-		void iterate(void);
+		float iterate(void);
 
 	public: // conf
 		bool use_webp_for_friends = true;

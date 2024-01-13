@@ -41,7 +41,7 @@ SDBot::SDBot(
 SDBot::~SDBot(void) {
 }
 
-void SDBot::iterate(void) {
+float SDBot::iterate(void) {
 	if (static_cast<bool>(_con) && _con->outstanding()) {
 		_con->pump();
 	} else if (!_prompt_queue.empty()) { // dequeue new task
@@ -109,6 +109,9 @@ void SDBot::iterate(void) {
 
 		_prompt_queue.pop();
 	}
+
+	// if active web connection, 5ms
+	return static_cast<bool>(_con) ? 0.005f : 1.f;
 }
 
 bool SDBot::onEvent(const Message::Events::MessageConstruct& e) {
