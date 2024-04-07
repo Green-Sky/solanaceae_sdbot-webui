@@ -33,7 +33,7 @@ if (SOLANACEAE_SDBOT_WEBUI_STANDALONE)
 endif()
 
 # external libs
-add_subdirectory(./external) # before increasing warn levels, sad :(
+add_subdirectory(./external EXCLUDE_FROM_ALL) # before increasing warn levels, sad :(
 
 if (SOLANACEAE_SDBOT_WEBUI_STANDALONE)
 	set(CMAKE_CXX_EXTENSIONS OFF)

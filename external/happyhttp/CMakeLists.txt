@@ -7,4 +7,7 @@ add_library(happyhttp STATIC
 
 target_include_directories(happyhttp PUBLIC .)
 target_compile_features(happyhttp PUBLIC cxx_std_11)
+if(WIN32)
+	target_link_libraries(happyhttp iphlpapi ws2_32)
+endif()
 

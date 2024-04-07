@@ -41,16 +41,6 @@ if (
 	endif()
 endif()
 
-# TODO: move entt dep into solanaceae_contact
-if (NOT TARGET EnTT::EnTT)
-	FetchContent_Declare(EnTT
-		GIT_REPOSITORY https://github.com/skypjack/entt.git
-		GIT_TAG v3.12.2
-		EXCLUDE_FROM_ALL
-	)
-	FetchContent_MakeAvailable(EnTT)
-endif()
-
 if (NOT TARGET solanaceae_util)
 	FetchContent_Declare(solanaceae_util
 		GIT_REPOSITORY https://github.com/Green-Sky/solanaceae_util.git
