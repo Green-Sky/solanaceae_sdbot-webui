@@ -1,5 +1,6 @@
 #pragma once
 
+#include <solanaceae/util/span.hpp>
 #include <solanaceae/message3/registry_message_model.hpp>
 #include <solanaceae/contact/contact_model3.hpp>
 
@@ -32,6 +33,19 @@ class SDBot : public RegistryMessageModelEventI {
 	std::vector<uint8_t> _con_data;
 
 	std::default_random_engine _rng;
+
+	public:
+		struct EndpointI {
+			RegistryMessageModel& _rmm;
+			std::default_random_engine& _rng;
+			EndpointI(RegistryMessageModel& rmm, std::default_random_engine& rng) : _rmm(rmm), _rng(rng) {}
+			virtual ~EndpointI(void) {}
+
+			virtual bool handleResponse(Contact3 contact, ByteSpan data) = 0;
+		};
+
+	private:
+		std::unique_ptr<EndpointI> _endpoint;
 
 	public:
 		SDBot(
