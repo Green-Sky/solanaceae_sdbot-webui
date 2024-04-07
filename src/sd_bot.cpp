@@ -22,6 +22,15 @@ SDBot::SDBot(
 	_rng.seed(std::random_device{}());
 	_rng.discard(3137);
 
+	if (!_conf.has_string("SDBot", "server_host")) {
+		_conf.set("SDBot", "server_host", std::string_view{"127.0.0.1"});
+	}
+	if (!_conf.has_int("SDBot", "server_port")) {
+		_conf.set("SDBot", "server_port", int64_t(7860)); // automatic11 default
+	}
+	if (!_conf.has_string("SDBot", "url_txt2img")) {
+		_conf.set("SDBot", "url_txt2img", std::string_view{"/sdapi/v1/txt2img"}); // automatic11 default
+	}
 	if (!_conf.has_int("SDBot", "width")) {
 		_conf.set("SDBot", "width", int64_t(512));
 	}
@@ -50,8 +59,11 @@ float SDBot::iterate(void) {
 		_current_task = task_id;
 
 		// TODO: reuse connection?
-		// TODO: read from config
-		_con = std::make_unique<happyhttp::Connection>("127.0.0.1", 7860);
+		const std::string server_host {_conf.get_string("SDBot", "server_host").value()};
+		_con = std::make_unique<happyhttp::Connection>(
+			server_host.c_str(),
+			_conf.get_int("SDBot", "server_port").value()
+		);
 		_con->setcallbacks(
 			+[](const happyhttp::Response* r, void* ud) { static_cast<SDBot*>(ud)->onHttpBegin(r); },
 			+[](const happyhttp::Response* r, void* ud, const uint8_t* data, int n) { static_cast<SDBot*>(ud)->onHttpData(r, data, n); },
@@ -98,7 +110,8 @@ float SDBot::iterate(void) {
 		std::string body = j_body.dump();
 
 		try {
-			_con->request("POST", "/sdapi/v1/txt2img", headers, reinterpret_cast<const uint8_t*>(body.data()), body.size());
+			const std::string url {_conf.get_string("SDBot", "url_txt2img").value()};
+			_con->request("POST", url.c_str(), headers, reinterpret_cast<const uint8_t*>(body.data()), body.size());
 		} catch (const happyhttp::Wobbly& e) {
 			std::cerr << "SDB http request error: " << e.what() << "\n";
 			// cleanup
@@ -209,7 +222,12 @@ void SDBot::onHttpComplete(const happyhttp::Response* r) {
 		//std::cout << std::string_view{reinterpret_cast<const char*>(_con_data.data()), _con_data.size()} << "\n";
 
 		// extract json result
-		const auto j = nlohmann::json::parse(std::string_view{reinterpret_cast<const char*>(_con_data.data()), _con_data.size()});
+		const auto j = nlohmann::json::parse(
+			std::string_view{reinterpret_cast<const char*>(_con_data.data()), _con_data.size()},
+			nullptr,
+			false
+		);
+		//std::cout << "json dump: " << j.dump() << "\n";
 
 		if (j.count("images") && !j.at("images").empty() && j.at("images").is_array()) {
 			for (const auto& i_j : j.at("images").items()) {
