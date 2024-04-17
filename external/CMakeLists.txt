@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.14...3.24 FATAL_ERROR)
 
 include(FetchContent)
 
-add_subdirectory(./happyhttp)
-
 if (
 	NOT TARGET libsodium AND
 	NOT TARGET unofficial-sodium::sodium AND
@@ -75,6 +73,15 @@ if (NOT TARGET solanaceae_plugin)
 		EXCLUDE_FROM_ALL
 	)
 	FetchContent_MakeAvailable(solanaceae_plugin)
+endif()
+
+if (NOT TARGET httplib::httplib)
+	FetchContent_Declare(httplib
+		GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+		GIT_TAG v0.15.3
+		EXCLUDE_FROM_ALL
+	)
+	FetchContent_MakeAvailable(httplib)
 endif()
 
 if (NOT TARGET nlohmann_json::nlohmann_json)

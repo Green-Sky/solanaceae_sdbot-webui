@@ -8,9 +8,9 @@
 #include <nlohmann/json.hpp>
 #include <sodium.h>
 
-#include <vector>
 #include <fstream>
 #include <filesystem>
+#include <chrono>
 
 #include <iostream>
 
@@ -186,31 +186,29 @@ SDBot::~SDBot(void) {
 }
 
 float SDBot::iterate(void) {
-	if (static_cast<bool>(_con) && _con->outstanding()) {
-		_con->pump();
-	} else if (!_prompt_queue.empty()) { // dequeue new task
+	if (_current_task.has_value() != _curr_future.has_value()) {
+		std::cerr << "SDB inconsistent state\n";
+
+		if (_current_task.has_value()) {
+			_task_map.erase(_current_task.value());
+			_current_task = std::nullopt;
+		}
+
+		if (_current_task.has_value()) {
+			_curr_future.reset();
+		}
+	}
+
+	if (!_prompt_queue.empty() && !_current_task.has_value()) { // dequeue new task
 		const auto& [task_id, prompt] = _prompt_queue.front();
 
 		_current_task = task_id;
 
-		// TODO: reuse connection?
-		const std::string server_host {_conf.get_string("SDBot", "server_host").value()};
-		_con = std::make_unique<happyhttp::Connection>(
-			server_host.c_str(),
-			_conf.get_int("SDBot", "server_port").value()
-		);
-		_con->setcallbacks(
-			+[](const happyhttp::Response* r, void* ud) { static_cast<SDBot*>(ud)->onHttpBegin(r); },
-			+[](const happyhttp::Response* r, void* ud, const uint8_t* data, int n) { static_cast<SDBot*>(ud)->onHttpData(r, data, n); },
-			+[](const happyhttp::Response* r, void* ud) { static_cast<SDBot*>(ud)->onHttpComplete(r); },
-			this
-		);
-
-		static const char* headers []  {
-			"accept: application/json",
-			"Content-Type: application/json",
-			nullptr,
-		};
+		if (_cli == nullptr) {
+			const std::string server_host {_conf.get_string("SDBot", "server_host").value()};
+			_cli = std::make_unique<httplib::Client>(server_host, _conf.get_int("SDBot", "server_port").value());
+			_cli->set_read_timeout(std::chrono::minutes(5));
+		}
 
 		nlohmann::json j_body;
 		j_body["width"] = _conf.get_int("SDBot", "width").value_or(512);
@@ -246,20 +244,55 @@ float SDBot::iterate(void) {
 
 		try {
 			const std::string url {_conf.get_string("SDBot", "url_txt2img").value()};
-			_con->request("POST", url.c_str(), headers, reinterpret_cast<const uint8_t*>(body.data()), body.size());
-		} catch (const happyhttp::Wobbly& e) {
-			std::cerr << "SDB http request error: " << e.what() << "\n";
+			_curr_future = std::async(std::launch::async, [this, url, body]() -> std::vector<uint8_t> {
+				// TODO: move to endpoint
+				auto res = _cli->Post(url, body, "application/json");
+				std::cout << "SDB http complete " << res->status << " " << res->reason << "\n";
+				if (
+					res.error() != httplib::Error::Success ||
+					res->status != 200
+				) {
+					return {};
+				}
+
+				return std::vector<uint8_t>(res->body.cbegin(), res->body.cend());
+			});
+		} catch (...) {
+			std::cerr << "SDB http request error\n";
 			// cleanup
 			_task_map.erase(_current_task.value());
 			_current_task = std::nullopt;
-			_con.reset();
+			_curr_future.reset();
 		}
 
 		_prompt_queue.pop();
 	}
 
+
+	if (_curr_future.has_value() && _curr_future.value().wait_for(std::chrono::milliseconds(1)) == std::future_status::ready) {
+		const auto& contact = _task_map.at(_current_task.value());
+
+		const auto data = _curr_future.value().get();
+
+		if (_endpoint->handleResponse(contact, ByteSpan{data})) {
+			// TODO: error handling
+		}
+
+		_task_map.erase(_current_task.value());
+		_current_task = std::nullopt;
+		_curr_future.reset();
+	}
+
+
 	// if active web connection, 5ms
-	return static_cast<bool>(_con) ? 0.005f : 1.f;
+	//return static_cast<bool>(_con) ? 0.005f : 1.f;
+
+	// if active web connection, 50ms
+	if (_curr_future.has_value() && _curr_future.value().valid()) {
+		return 0.05f;
+	} else {
+		return 1.f;
+	}
 }
 
 bool SDBot::onEvent(const Message::Events::MessageConstruct& e) {
@@ -334,35 +367,5 @@ bool SDBot::onEvent(const Message::Events::MessageConstruct& e) {
 	// TODO: mark message read?
 
 	return true;
-}
-
-void SDBot::onHttpBegin(const happyhttp::Response* r) {
-	std::cout << "SDB http begin " << r->getstatus() << " " << r->getreason() << "\n";
-	// TODO: handle errors
-	_con_data.clear();
-}
-
-void SDBot::onHttpData(const happyhttp::Response* /*r*/, const unsigned char* data, int n) {
-	//std::cout << "SDB http data\n";
-	// TODO: handle errors
-	for (int i = 0; i < n; i++) {
-		_con_data.push_back(data[i]);
-	}
-}
-
-void SDBot::onHttpComplete(const happyhttp::Response* r) {
-	std::cout << "SDB http complete " << r->getstatus() << " " << r->getreason() << "\n";
-	if (r->getstatus() == happyhttp::OK) {
-		std::cout << "SDB data\n";
-
-		const auto& contact = _task_map.at(_current_task.value());
-		if (_endpoint->handleResponse(contact, ByteSpan{_con_data})) {
-			// error?
-		}
-
-		_task_map.erase(_current_task.value());
-		_current_task = std::nullopt;
-		_con.reset();
-	}
 }
 

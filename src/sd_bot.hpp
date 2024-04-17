@@ -4,14 +4,16 @@
 #include <solanaceae/message3/registry_message_model.hpp>
 #include <solanaceae/contact/contact_model3.hpp>
 
-#include <happyhttp/happyhttp.h>
+#include <httplib.h>
 
 #include <map>
+#include <vector>
 #include <queue>
 #include <string>
 #include <memory>
 #include <optional>
 #include <random>
+#include <future>
 
 // fwd
 struct ConfigModelI;
@@ -29,8 +31,8 @@ class SDBot : public RegistryMessageModelEventI {
 	uint64_t _last_task_counter = 0;
 
 	std::optional<uint64_t> _current_task;
-	std::unique_ptr<happyhttp::Connection> _con;
-	std::vector<uint8_t> _con_data;
+	std::unique_ptr<httplib::Client> _cli;
+	std::optional<std::future<std::vector<uint8_t>>> _curr_future;
 
 	std::default_random_engine _rng;
 
@@ -66,10 +68,5 @@ class SDBot : public RegistryMessageModelEventI {
 		//bool onToxEvent(const Tox_Event_Group_Message* e) override;
 	protected: // mm
 		bool onEvent(const Message::Events::MessageConstruct& e) override;
-
-	public: // http cb
-		void onHttpBegin(const happyhttp::Response* r);
-		void onHttpData(const happyhttp::Response* r, const unsigned char* data, int n);
-		void onHttpComplete(const happyhttp::Response* r);
 };
 
