@@ -194,8 +194,8 @@ float SDBot::iterate(void) {
 			_current_task = std::nullopt;
 		}
 
-		if (_current_task.has_value()) {
-			_curr_future.reset();
+		if (_curr_future.has_value()) {
+			_curr_future.reset(); // might block and wait
 		}
 	}
 
@@ -206,8 +206,8 @@ float SDBot::iterate(void) {
 
 		if (_cli == nullptr) {
 			const std::string server_host {_conf.get_string("SDBot", "server_host").value()};
-			_cli = std::make_unique<httplib::Client>(server_host, _conf.get_int("SDBot", "server_port").value());
-			_cli->set_read_timeout(std::chrono::minutes(5));
+			_cli = std::make_shared<httplib::Client>(server_host, _conf.get_int("SDBot", "server_port").value());
+			_cli->set_read_timeout(std::chrono::minutes(2)); // because of discarding futures, it can block main for a while
 		}
 
 		nlohmann::json j_body;
@@ -244,10 +244,17 @@ float SDBot::iterate(void) {
 
 		try {
 			const std::string url {_conf.get_string("SDBot", "url_txt2img").value()};
-			_curr_future = std::async(std::launch::async, [this, url, body]() -> std::vector<uint8_t> {
+			_curr_future = std::async(std::launch::async, [url, body, cli = _cli]() -> std::vector<uint8_t> {
+				if (!static_cast<bool>(cli)) {
+					return {};
+				}
 				// TODO: move to endpoint
-				auto res = _cli->Post(url, body, "application/json");
-				std::cout << "SDB http complete " << res->status << " " << res->reason << "\n";
+				auto res = cli->Post(url, body, "application/json");
+				if (!static_cast<bool>(res)) {
+					std::cerr << "SDB error: post to sd server failed!\n";
+					return {};
+				}
+				std::cerr << "SDB http complete " << res->status << " " << res->reason << "\n";
 				if (
 					res.error() != httplib::Error::Success ||
 					res->status != 200
@@ -262,7 +269,7 @@ float SDBot::iterate(void) {
 			// cleanup
 			_task_map.erase(_current_task.value());
 			_current_task = std::nullopt;
-			_curr_future.reset();
+			_curr_future.reset(); // might block and wait
 		}
 
 		_prompt_queue.pop();

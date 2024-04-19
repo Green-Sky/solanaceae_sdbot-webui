@@ -32,6 +32,9 @@ if (SOLANACEAE_SDBOT_WEBUI_STANDALONE)
 	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 endif()
 
+#add_compile_options(-fsanitize=undefined)
+#link_libraries(-fsanitize=undefined)
+
 # external libs
 add_subdirectory(./external EXCLUDE_FROM_ALL) # before increasing warn levels, sad :(
 

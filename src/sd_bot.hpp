@@ -31,7 +31,7 @@ class SDBot : public RegistryMessageModelEventI {
 	uint64_t _last_task_counter = 0;
 
 	std::optional<uint64_t> _current_task;
-	std::unique_ptr<httplib::Client> _cli;
+	std::shared_ptr<httplib::Client> _cli;
 	std::optional<std::future<std::vector<uint8_t>>> _curr_future;
 
 	std::default_random_engine _rng;
