@@ -4,6 +4,9 @@
 
 #include <solanaceae/util/config_model.hpp>
 
+#include <entt/entt.hpp>
+#include <entt/fwd.hpp>
+
 #include <memory>
 #include <iostream>
 
