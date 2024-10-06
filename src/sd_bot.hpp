@@ -20,7 +20,7 @@ struct ConfigModelI;
 
 class SDBot : public RegistryMessageModelEventI {
 	Contact3Registry& _cr;
-	RegistryMessageModel& _rmm;
+	RegistryMessageModelI& _rmm;
 	ConfigModelI& _conf;
 
 	//TransferManager& _tm;
@@ -38,9 +38,9 @@ class SDBot : public RegistryMessageModelEventI {
 
 	public:
 		struct EndpointI {
-			RegistryMessageModel& _rmm;
+			RegistryMessageModelI& _rmm;
 			std::default_random_engine& _rng;
-			EndpointI(RegistryMessageModel& rmm, std::default_random_engine& rng) : _rmm(rmm), _rng(rng) {}
+			EndpointI(RegistryMessageModelI& rmm, std::default_random_engine& rng) : _rmm(rmm), _rng(rng) {}
 			virtual ~EndpointI(void) {}
 
 			virtual bool handleResponse(Contact3 contact, ByteSpan data) = 0;
@@ -52,7 +52,7 @@ class SDBot : public RegistryMessageModelEventI {
 	public:
 		SDBot(
 			Contact3Registry& cr,
-			RegistryMessageModel& rmm,
+			RegistryMessageModelI& rmm,
 			ConfigModelI& conf
 		);
 		~SDBot(void);

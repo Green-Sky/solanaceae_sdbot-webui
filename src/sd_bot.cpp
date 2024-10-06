@@ -15,7 +15,7 @@
 #include <iostream>
 
 struct Automatic1111_v1_Endpoint : public SDBot::EndpointI {
-	Automatic1111_v1_Endpoint(RegistryMessageModel& rmm, std::default_random_engine& rng) : SDBot::EndpointI(rmm, rng) {}
+	Automatic1111_v1_Endpoint(RegistryMessageModelI& rmm, std::default_random_engine& rng) : SDBot::EndpointI(rmm, rng) {}
 
 	bool handleResponse(Contact3 contact, ByteSpan data) override {
 		//std::cout << std::string_view{reinterpret_cast<const char*>(data.ptr), data.size} << "\n";
@@ -61,7 +61,7 @@ struct Automatic1111_v1_Endpoint : public SDBot::EndpointI {
 };
 
 struct SDcpp_wip1_Endpoint : public SDBot::EndpointI {
-	SDcpp_wip1_Endpoint(RegistryMessageModel& rmm, std::default_random_engine& rng) : SDBot::EndpointI(rmm, rng) {}
+	SDcpp_wip1_Endpoint(RegistryMessageModelI& rmm, std::default_random_engine& rng) : SDBot::EndpointI(rmm, rng) {}
 
 	bool handleResponse(Contact3 contact, ByteSpan data) override {
 		//std::cout << std::string_view{reinterpret_cast<const char*>(data.ptr), data.size} << "\n";
@@ -131,7 +131,7 @@ struct SDcpp_wip1_Endpoint : public SDBot::EndpointI {
 
 SDBot::SDBot(
 	Contact3Registry& cr,
-	RegistryMessageModel& rmm,
+	RegistryMessageModelI& rmm,
 	ConfigModelI& conf
 ) : _cr(cr), _rmm(rmm), _conf(conf) {
 	_rng.seed(std::random_device{}());
