@@ -129,6 +129,77 @@ struct SDcpp_wip1_Endpoint : public SDBot::EndpointI {
 	}
 };
 
+struct SDcpp_stduhpf_wip1_Endpoint : public SDBot::EndpointI {
+	SDcpp_stduhpf_wip1_Endpoint(RegistryMessageModelI& rmm, std::default_random_engine& rng) : SDBot::EndpointI(rmm, rng) {}
+
+	bool handleResponse(Contact3 contact, ByteSpan data) override {
+		bool succ = true;
+
+		try {
+			// extract json result
+			const auto j = nlohmann::json::parse(
+				std::string_view{reinterpret_cast<const char*>(data.ptr), data.size}
+			);
+
+			if (!j.is_array()) {
+				std::cerr << "SDB: json response was not an array\n";
+				return false;
+			}
+
+			for (const auto& j_entry : j) {
+				if (!j_entry.is_object()) {
+					std::cerr << "SDB warning: non object entry, skipping\n";
+					continue;
+				}
+
+				// for each returned image
+				// "channel": 3, // rgb?
+				// "data": base64 encoded image file
+				// "encoding": "png",
+				// "height": 512,
+				// "width": 512
+
+				if (j_entry.contains("encoding")) {
+					if (!j_entry["encoding"].is_string() || j_entry["encoding"] != "png") {
+						std::cerr << "SDB warning: unknown encoding '" << j_entry["encoding"] << "'\n";
+					}
+				}
+
+				if (!j_entry.contains("data") || !j_entry.at("data").is_string()) {
+					std::cerr << "SDB warning: non data entry, skipping\n";
+					continue;
+				}
+
+				const auto& img_data_str = j_entry.at("data").get<std::string>();
+				// decode data (base64)
+				std::vector<uint8_t> png_data(img_data_str.size()); // just init to upper bound
+				size_t decoded_size {0};
+				sodium_base642bin(
+					png_data.data(), png_data.size(),
+					img_data_str.data(), img_data_str.size(),
+					" \n\t",
+					&decoded_size,
+					nullptr,
+					sodium_base64_VARIANT_ORIGINAL
+				);
+				png_data.resize(decoded_size);
+
+				std::filesystem::create_directories("sdbot_img_send");
+				//const std::string tmp_img_file_name = "sdbot_img_" + std::to_string(_current_task.value()) + ".png";
+				const std::string tmp_img_file_name = "sdbot_img_" + std::to_string(_rng()) + ".png";
+				const std::string tmp_img_file_path = "sdbot_img_send/" + tmp_img_file_name;
+
+				std::ofstream(tmp_img_file_path).write(reinterpret_cast<const char*>(png_data.data()), png_data.size());
+				succ = succ && _rmm.sendFilePath(contact, tmp_img_file_name, tmp_img_file_path);
+			}
+		} catch (...) {
+			return false;
+		}
+
+		return succ;
+	}
+};
+
 SDBot::SDBot(
 	Contact3Registry& cr,
 	RegistryMessageModelI& rmm,
@@ -148,6 +219,8 @@ SDBot::SDBot(
 			_endpoint = std::make_unique<Automatic1111_v1_Endpoint>(_rmm, _rng);
 		} else if (endpoint_type == "sdcpp_wip1") {
 			_endpoint = std::make_unique<SDcpp_wip1_Endpoint>(_rmm, _rng);
+		} else if (endpoint_type == "sdcpp_stduhpf_wip1") {
+			_endpoint = std::make_unique<SDcpp_stduhpf_wip1_Endpoint>(_rmm, _rng);
 		} else {
 			std::cerr << "SDB error: unknown endpoint type '" << endpoint_type << "'\n";
 			// TODO: throw?
