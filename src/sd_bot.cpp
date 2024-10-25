@@ -204,7 +204,7 @@ SDBot::SDBot(
 	Contact3Registry& cr,
 	RegistryMessageModelI& rmm,
 	ConfigModelI& conf
-) : _cr(cr), _rmm(rmm), _conf(conf) {
+) : _cr(cr), _rmm(rmm), _rmm_sr(_rmm.newSubRef(this)), _conf(conf) {
 	_rng.seed(std::random_device{}());
 	_rng.discard(3137);
 
@@ -252,7 +252,7 @@ SDBot::SDBot(
 		_conf.set("SDBot", "cfg_scale", 6.5);
 	}
 
-	_rmm.subscribe(this, RegistryMessageModel_Event::message_construct);
+	_rmm_sr.subscribe(RegistryMessageModel_Event::message_construct);
 }
 
 SDBot::~SDBot(void) {
