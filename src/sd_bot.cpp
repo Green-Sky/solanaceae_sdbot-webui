@@ -1,6 +1,7 @@
 #include "./sd_bot.hpp"
 
 #include <solanaceae/util/config_model.hpp>
+#include <solanaceae/contact/contact_store_i.hpp>
 
 #include <solanaceae/contact/components.hpp>
 #include <solanaceae/message3/components.hpp>
@@ -17,7 +18,7 @@
 struct Automatic1111_v1_Endpoint : public SDBot::EndpointI {
 	Automatic1111_v1_Endpoint(RegistryMessageModelI& rmm, std::default_random_engine& rng) : SDBot::EndpointI(rmm, rng) {}
 
-	bool handleResponse(Contact3 contact, ByteSpan data) override {
+	bool handleResponse(Contact4 contact, ByteSpan data) override {
 		//std::cout << std::string_view{reinterpret_cast<const char*>(data.ptr), data.size} << "\n";
 
 		// extract json result
@@ -63,7 +64,7 @@ struct Automatic1111_v1_Endpoint : public SDBot::EndpointI {
 struct SDcpp_wip1_Endpoint : public SDBot::EndpointI {
 	SDcpp_wip1_Endpoint(RegistryMessageModelI& rmm, std::default_random_engine& rng) : SDBot::EndpointI(rmm, rng) {}
 
-	bool handleResponse(Contact3 contact, ByteSpan data) override {
+	bool handleResponse(Contact4 contact, ByteSpan data) override {
 		//std::cout << std::string_view{reinterpret_cast<const char*>(data.ptr), data.size} << "\n";
 
 		std::string_view data_str {reinterpret_cast<const char*>(data.ptr), data.size};
@@ -132,7 +133,7 @@ struct SDcpp_wip1_Endpoint : public SDBot::EndpointI {
 struct SDcpp_stduhpf_wip1_Endpoint : public SDBot::EndpointI {
 	SDcpp_stduhpf_wip1_Endpoint(RegistryMessageModelI& rmm, std::default_random_engine& rng) : SDBot::EndpointI(rmm, rng) {}
 
-	bool handleResponse(Contact3 contact, ByteSpan data) override {
+	bool handleResponse(Contact4 contact, ByteSpan data) override {
 		bool succ = true;
 
 		try {
@@ -201,10 +202,10 @@ struct SDcpp_stduhpf_wip1_Endpoint : public SDBot::EndpointI {
 };
 
 SDBot::SDBot(
-	Contact3Registry& cr,
+	ContactStore4I& cs,
 	RegistryMessageModelI& rmm,
 	ConfigModelI& conf
-) : _cr(cr), _rmm(rmm), _rmm_sr(_rmm.newSubRef(this)), _conf(conf) {
+) : _cs(cs), _rmm(rmm), _rmm_sr(_rmm.newSubRef(this)), _conf(conf) {
 	_rng.seed(std::random_device{}());
 	_rng.discard(3137);
 
@@ -415,7 +416,9 @@ bool SDBot::onEvent(const Message::Events::MessageConstruct& e) {
 	const auto contact_to = e.e.get<Message::Components::ContactTo>().c;
 	const auto contact_from = e.e.get<Message::Components::ContactFrom>().c;
 
-	const bool is_private = _cr.any_of<Contact::Components::TagSelfWeak, Contact::Components::TagSelfStrong>(contact_to);
+	const auto& cr = _cs.registry();
+
+	const bool is_private = cr.any_of<Contact::Components::TagSelfWeak, Contact::Components::TagSelfStrong>(contact_to);
 
 	if (is_private) {
 		std::cout << "SDB private message " << message_text << " (l:" << message_text.size() << ")\n";
@@ -425,13 +428,13 @@ bool SDBot::onEvent(const Message::Events::MessageConstruct& e) {
 			_prompt_queue.push(std::make_pair(uint64_t{id}, std::string{message_text}));
 		}
 	} else {
-		assert(_cr.all_of<Contact::Components::Self>(contact_to));
-		const auto contact_self = _cr.get<Contact::Components::Self>(contact_to).self;
-		if (!_cr.all_of<Contact::Components::Name>(contact_self)) {
+		assert(cr.all_of<Contact::Components::Self>(contact_to));
+		const auto contact_self = cr.get<Contact::Components::Self>(contact_to).self;
+		if (!cr.all_of<Contact::Components::Name>(contact_self)) {
 			std::cerr << "SDB error: dont have self name\n";
 			return false;
 		}
-		const auto& self_name = _cr.get<Contact::Components::Name>(contact_self).name;
+		const auto& self_name = cr.get<Contact::Components::Name>(contact_self).name;
 
 		const auto self_prefix = self_name + ": ";
 

@@ -2,7 +2,7 @@
 
 #include <solanaceae/util/span.hpp>
 #include <solanaceae/message3/registry_message_model.hpp>
-#include <solanaceae/contact/contact_model3.hpp>
+#include <solanaceae/contact/fwd.hpp>
 
 #include <httplib.h>
 
@@ -19,7 +19,7 @@
 struct ConfigModelI;
 
 class SDBot : public RegistryMessageModelEventI {
-	Contact3Registry& _cr;
+	ContactStore4I& _cs;
 	RegistryMessageModelI& _rmm;
 	RegistryMessageModelI::SubscriptionReference _rmm_sr;
 	ConfigModelI& _conf;
@@ -27,7 +27,7 @@ class SDBot : public RegistryMessageModelEventI {
 	//TransferManager& _tm;
 
 	//std::map<uint64_t, std::variant<ContactFriend, ContactConference, ContactGroupPeer>> _task_map;
-	std::map<uint64_t, Contact3> _task_map;
+	std::map<uint64_t, Contact4> _task_map;
 	std::queue<std::pair<uint64_t, std::string>> _prompt_queue;
 	uint64_t _last_task_counter = 0;
 
@@ -44,7 +44,7 @@ class SDBot : public RegistryMessageModelEventI {
 			EndpointI(RegistryMessageModelI& rmm, std::default_random_engine& rng) : _rmm(rmm), _rng(rng) {}
 			virtual ~EndpointI(void) {}
 
-			virtual bool handleResponse(Contact3 contact, ByteSpan data) = 0;
+			virtual bool handleResponse(Contact4 contact, ByteSpan data) = 0;
 		};
 
 	private:
@@ -52,7 +52,7 @@ class SDBot : public RegistryMessageModelEventI {
 
 	public:
 		SDBot(
-			Contact3Registry& cr,
+			ContactStore4I& cs,
 			RegistryMessageModelI& rmm,
 			ConfigModelI& conf
 		);

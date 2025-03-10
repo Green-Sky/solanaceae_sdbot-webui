@@ -1,5 +1,7 @@
 #include <solanaceae/plugin/solana_plugin_v1.h>
 
+#include <solanaceae/contact/contact_store_i.hpp>
+
 #include "../src/sd_bot.hpp"
 
 #include <solanaceae/util/config_model.hpp>
@@ -32,13 +34,13 @@ SOLANA_PLUGIN_EXPORT uint32_t solana_plugin_start(struct SolanaAPI* solana_api) 
 	}
 
 	try {
-		auto* cr = PLUG_RESOLVE_INSTANCE_VERSIONED(Contact3Registry, "1");
+		auto* cs = PLUG_RESOLVE_INSTANCE(ContactStore4I);
 		auto* rmm = PLUG_RESOLVE_INSTANCE(RegistryMessageModelI);
 		auto* conf = PLUG_RESOLVE_INSTANCE(ConfigModelI);
 
 		// static store, could be anywhere tho
 		// construct with fetched dependencies
-		g_sdbot = std::make_unique<SDBot>(*cr, *rmm, *conf);
+		g_sdbot = std::make_unique<SDBot>(*cs, *rmm, *conf);
 
 		// register types
 		PLUG_PROVIDE_INSTANCE(SDBot, plugin_name, g_sdbot.get());
