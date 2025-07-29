@@ -6,200 +6,14 @@
 #include <solanaceae/contact/components.hpp>
 #include <solanaceae/message3/components.hpp>
 
-#include <nlohmann/json.hpp>
-#include <sodium.h>
+#include "./webapi_sdcpp_stduhpf_wip2.hpp"
 
 #include <fstream>
 #include <filesystem>
 #include <chrono>
 
 #include <iostream>
-
-struct Automatic1111_v1_Endpoint : public SDBot::EndpointI {
-	Automatic1111_v1_Endpoint(RegistryMessageModelI& rmm, std::default_random_engine& rng) : SDBot::EndpointI(rmm, rng) {}
-
-	bool handleResponse(Contact4 contact, ByteSpan data) override {
-		//std::cout << std::string_view{reinterpret_cast<const char*>(data.ptr), data.size} << "\n";
-
-		// extract json result
-		const auto j = nlohmann::json::parse(
-			std::string_view{reinterpret_cast<const char*>(data.ptr), data.size},
-			nullptr,
-			false
-		);
-		//std::cout << "json dump: " << j.dump() << "\n";
-
-		if (j.count("images") && !j.at("images").empty() && j.at("images").is_array()) {
-			for (const auto& i_j : j.at("images").items()) {
-				// decode data (base64)
-				std::vector<uint8_t> png_data(data.size); // just init to upper bound
-				size_t decoded_size {0};
-				sodium_base642bin(
-					png_data.data(), png_data.size(),
-					i_j.value().get<std::string>().data(), i_j.value().get<std::string>().size(),
-					" \n\t",
-					&decoded_size,
-					nullptr,
-					sodium_base64_VARIANT_ORIGINAL
-				);
-				png_data.resize(decoded_size);
-
-				std::filesystem::create_directories("sdbot_img_send");
-				//const std::string tmp_img_file_name = "sdbot_img_" + std::to_string(_current_task.value()) + ".png";
-				const std::string tmp_img_file_name = "sdbot_img_" + std::to_string(_rng()) + ".png";
-				const std::string tmp_img_file_path = "sdbot_img_send/" + tmp_img_file_name;
-
-				std::ofstream(tmp_img_file_path).write(reinterpret_cast<const char*>(png_data.data()), png_data.size());
-				_rmm.sendFilePath(contact, tmp_img_file_name, tmp_img_file_path);
-			}
-		} else {
-			std::cerr << "SDB json response did not contain images?\n";
-			return false;
-		}
-
-		return true;
-	}
-};
-
-struct SDcpp_wip1_Endpoint : public SDBot::EndpointI {
-	SDcpp_wip1_Endpoint(RegistryMessageModelI& rmm, std::default_random_engine& rng) : SDBot::EndpointI(rmm, rng) {}
-
-	bool handleResponse(Contact4 contact, ByteSpan data) override {
-		//std::cout << std::string_view{reinterpret_cast<const char*>(data.ptr), data.size} << "\n";
-
-		std::string_view data_str {reinterpret_cast<const char*>(data.ptr), data.size};
-		auto nl_pos {std::string_view::npos};
-		bool succ {false};
-		do {
-			// for each line, should be "data: <json>" or empty
-			nl_pos = data_str.find_first_of('\n');
-
-			// npos is also valid
-			auto line = data_str.substr(0, nl_pos);
-
-			// at least minimum viable
-			if (line.size() >= std::string_view{"data: {}"}.size()) {
-				//std::cout << "got data line!!!!!!!!!!!:\n";
-				//std::cout << line << "\n";
-				line.remove_prefix(6);
-
-				const auto j = nlohmann::json::parse(
-					line,
-					nullptr,
-					false
-				);
-
-				if (
-					!j.empty() &&
-					j.value("type", "notimag") == "image" &&
-					j.contains("data") &&
-					j.at("data").is_string()
-				) {
-					const auto& img_data_str = j.at("data").get<std::string>();
-					// decode data (base64)
-					std::vector<uint8_t> png_data(img_data_str.size()); // just init to upper bound
-					size_t decoded_size {0};
-					sodium_base642bin(
-						png_data.data(), png_data.size(),
-						img_data_str.data(), img_data_str.size(),
-						" \n\t",
-						&decoded_size,
-						nullptr,
-						sodium_base64_VARIANT_ORIGINAL
-					);
-					png_data.resize(decoded_size);
-
-					std::filesystem::create_directories("sdbot_img_send");
-					//const std::string tmp_img_file_name = "sdbot_img_" + std::to_string(_current_task.value()) + ".png";
-					const std::string tmp_img_file_name = "sdbot_img_" + std::to_string(_rng()) + ".png";
-					const std::string tmp_img_file_path = "sdbot_img_send/" + tmp_img_file_name;
-
-					std::ofstream(tmp_img_file_path).write(reinterpret_cast<const char*>(png_data.data()), png_data.size());
-					succ = _rmm.sendFilePath(contact, tmp_img_file_name, tmp_img_file_path);
-				}
-			}
-
-			if (nl_pos == std::string_view::npos || nl_pos+1 >= data_str.size()) {
-				break;
-			}
-
-			data_str = data_str.substr(nl_pos+1);
-		} while (nl_pos != std::string_view::npos);
-
-		return succ;
-	}
-};
-
-struct SDcpp_stduhpf_wip1_Endpoint : public SDBot::EndpointI {
-	SDcpp_stduhpf_wip1_Endpoint(RegistryMessageModelI& rmm, std::default_random_engine& rng) : SDBot::EndpointI(rmm, rng) {}
-
-	bool handleResponse(Contact4 contact, ByteSpan data) override {
-		bool succ = true;
-
-		try {
-			// extract json result
-			const auto j = nlohmann::json::parse(
-				std::string_view{reinterpret_cast<const char*>(data.ptr), data.size}
-			);
-
-			if (!j.is_array()) {
-				std::cerr << "SDB: json response was not an array\n";
-				return false;
-			}
-
-			for (const auto& j_entry : j) {
-				if (!j_entry.is_object()) {
-					std::cerr << "SDB warning: non object entry, skipping\n";
-					continue;
-				}
-
-				// for each returned image
-				// "channel": 3, // rgb?
-				// "data": base64 encoded image file
-				// "encoding": "png",
-				// "height": 512,
-				// "width": 512
-
-				if (j_entry.contains("encoding")) {
-					if (!j_entry["encoding"].is_string() || j_entry["encoding"] != "png") {
-						std::cerr << "SDB warning: unknown encoding '" << j_entry["encoding"] << "'\n";
-					}
-				}
-
-				if (!j_entry.contains("data") || !j_entry.at("data").is_string()) {
-					std::cerr << "SDB warning: non data entry, skipping\n";
-					continue;
-				}
-
-				const auto& img_data_str = j_entry.at("data").get<std::string>();
-				// decode data (base64)
-				std::vector<uint8_t> png_data(img_data_str.size()); // just init to upper bound
-				size_t decoded_size {0};
-				sodium_base642bin(
-					png_data.data(), png_data.size(),
-					img_data_str.data(), img_data_str.size(),
-					" \n\t",
-					&decoded_size,
-					nullptr,
-					sodium_base64_VARIANT_ORIGINAL
-				);
-				png_data.resize(decoded_size);
-
-				std::filesystem::create_directories("sdbot_img_send");
-				//const std::string tmp_img_file_name = "sdbot_img_" + std::to_string(_current_task.value()) + ".png";
-				const std::string tmp_img_file_name = "sdbot_img_" + std::to_string(_rng()) + ".png";
-				const std::string tmp_img_file_path = "sdbot_img_send/" + tmp_img_file_name;
-
-				std::ofstream(tmp_img_file_path).write(reinterpret_cast<const char*>(png_data.data()), png_data.size());
-				succ = succ && _rmm.sendFilePath(contact, tmp_img_file_name, tmp_img_file_path);
-			}
-		} catch (...) {
-			return false;
-		}
-
-		return succ;
-	}
-};
+#include <stdexcept>
 
 SDBot::SDBot(
 	ContactStore4I& cs,
@@ -210,22 +24,16 @@ SDBot::SDBot(
 	_rng.discard(3137);
 
 	if (!_conf.has_string("SDBot", "endpoint_type")) {
-		_conf.set("SDBot", "endpoint_type", std::string_view{"automatic1111_v1"}); // automatic11 default
+		_conf.set("SDBot", "endpoint_type", std::string_view{"sdcpp_stduhpf_wip2"}); // default
 	}
 
 	//HACKy
 	{ // construct endpoint
 		const std::string_view endpoint_type = _conf.get_string("SDBot", "endpoint_type").value();
-		if (endpoint_type == "automatic1111_v1") {
-			_endpoint = std::make_unique<Automatic1111_v1_Endpoint>(_rmm, _rng);
-		} else if (endpoint_type == "sdcpp_wip1") {
-			_endpoint = std::make_unique<SDcpp_wip1_Endpoint>(_rmm, _rng);
-		} else if (endpoint_type == "sdcpp_stduhpf_wip1") {
-			_endpoint = std::make_unique<SDcpp_stduhpf_wip1_Endpoint>(_rmm, _rng);
+		if (endpoint_type == "sdcpp_stduhpf_wip2") {
+			_endpoint = std::make_unique<WebAPI_sdcpp_stduhpf_wip2>(_conf);
 		} else {
-			std::cerr << "SDB error: unknown endpoint type '" << endpoint_type << "'\n";
-			// TODO: throw?
-			_endpoint = std::make_unique<Automatic1111_v1_Endpoint>(_rmm, _rng);
+			throw std::runtime_error("missing endpoint type in config, cant continue!");
 		}
 	}
 
@@ -260,117 +68,61 @@ SDBot::~SDBot(void) {
 }
 
 float SDBot::iterate(void) {
-	if (_current_task.has_value() != _curr_future.has_value()) {
+	if (_current_task_id.has_value() != (_current_task != nullptr)) {
 		std::cerr << "SDB inconsistent state\n";
 
-		if (_current_task.has_value()) {
-			_task_map.erase(_current_task.value());
-			_current_task = std::nullopt;
+		if (_current_task_id.has_value()) {
+			_task_map.erase(_current_task_id.value());
+			_current_task_id = std::nullopt;
 		}
 
-		if (_curr_future.has_value()) {
-			_curr_future.reset(); // might block and wait
-		}
+		_current_task.reset();
 	}
 
-	if (!_prompt_queue.empty() && !_current_task.has_value()) { // dequeue new task
+	if (!_prompt_queue.empty() && !_current_task_id.has_value()) { // dequeue new task
 		const auto& [task_id, prompt] = _prompt_queue.front();
 
-		_current_task = task_id;
-
-		if (_cli == nullptr) {
-			const std::string server_host {_conf.get_string("SDBot", "server_host").value()};
-			_cli = std::make_shared<httplib::Client>(server_host, _conf.get_int("SDBot", "server_port").value());
-			_cli->set_read_timeout(std::chrono::minutes(2)); // because of discarding futures, it can block main for a while
-		}
-
-		nlohmann::json j_body;
-		j_body["width"] = _conf.get_int("SDBot", "width").value_or(512);
-		j_body["height"] = _conf.get_int("SDBot", "height").value_or(512);
-
-		//j_body["prompt"] = prompt;
-		//"<lora:lcm-lora-sdv1-5:1>"
-		j_body["prompt"] = std::string{_conf.get_string("SDBot", "prompt_prefix").value_or("")} + prompt;
-		// TODO: negative prompt
-
-		j_body["seed"] = -1;
-#if 0
-		j_body["steps"] = 20;
-		//j_body["steps"] = 5;
-		j_body["cfg_scale"] = 6.5;
-		j_body["sampler_index"] = "Euler a";
-#else
-		//j_body["steps"] = 4;
-		j_body["steps"] = _conf.get_int("SDBot", "steps").value_or(20);
-		//j_body["cfg_scale"] = 1;
-		j_body["cfg_scale"] = _conf.get_double("SDBot", "cfg_scale").value_or(6.5);
-		//j_body["sampler_index"] = "LCM Test";
-		j_body["sampler_index"] = std::string{_conf.get_string("SDBot", "sampler_index").value_or("Euler a")};
-#endif
-
-		j_body["batch_size"] = 1;
-		j_body["n_iter"] = 1;
-		j_body["restore_faces"] = false;
-		j_body["tiling"] = false;
-		j_body["enable_hr"] = false;
-
-		std::string body = j_body.dump();
-
-		try {
-			const std::string url {_conf.get_string("SDBot", "url_txt2img").value()};
-			_curr_future = std::async(std::launch::async, [url, body, cli = _cli]() -> std::vector<uint8_t> {
-				if (!static_cast<bool>(cli)) {
-					return {};
-				}
-				// TODO: move to endpoint
-				auto res = cli->Post(url, body, "application/json");
-				if (!static_cast<bool>(res)) {
-					std::cerr << "SDB error: post to sd server failed!\n";
-					return {};
-				}
-				std::cerr << "SDB http complete " << res->status << " " << res->reason << "\n";
-				if (
-					res.error() != httplib::Error::Success ||
-					res->status != 200
-				) {
-					return {};
-				}
-
-				return std::vector<uint8_t>(res->body.cbegin(), res->body.cend());
-			});
-		} catch (...) {
-			std::cerr << "SDB http request error\n";
-			// cleanup
-			_task_map.erase(_current_task.value());
-			_current_task = std::nullopt;
-			_curr_future.reset(); // might block and wait
+		_current_task = _endpoint->txt2img(
+			prompt,
+			_conf.get_int("SDBot", "width").value_or(512),
+			_conf.get_int("SDBot", "height").value_or(512)
+		);
+		if (_current_task == nullptr) {
+			// ERROR
+			std::cerr << "SDB error: call to txt2img failed!\n";
+			_task_map.erase(task_id);
+		} else {
+			_current_task_id = task_id;
 		}
 
 		_prompt_queue.pop();
 	}
 
 
-	if (_curr_future.has_value() && _curr_future.value().wait_for(std::chrono::milliseconds(1)) == std::future_status::ready) {
-		const auto& contact = _task_map.at(_current_task.value());
+	if (_current_task_id && _current_task && _current_task->ready()) {
 
-		const auto data = _curr_future.value().get();
+		auto res_opt = _current_task->get();
+		if (res_opt) {
+			const auto& contact = _task_map.at(_current_task_id.value());
 
-		if (_endpoint->handleResponse(contact, ByteSpan{data})) {
-			// TODO: error handling
+			std::filesystem::create_directories("sdbot_img_send");
+			const std::string tmp_img_file_name = "sdbot_img_" + std::to_string(_rng()) + "." + res_opt.value().file_name;
+			const std::string tmp_img_file_path = "sdbot_img_send/" + tmp_img_file_name;
+
+			std::ofstream(tmp_img_file_path).write(reinterpret_cast<const char*>(res_opt.value().data.data()), res_opt.value().data.size());
+			_rmm.sendFilePath(contact, tmp_img_file_name, tmp_img_file_path);
+		} else {
+			std::cerr << "SDB error: call to txt2img failed (task returned nothing)!\n";
 		}
 
-		_task_map.erase(_current_task.value());
-		_current_task = std::nullopt;
-		_curr_future.reset();
+
+		_current_task_id.reset();
+		_current_task.reset();
 	}
 
-
-	// if active web connection, 5ms
-	//return static_cast<bool>(_con) ? 0.005f : 1.f;
-
-	// if active web connection, 50ms
-	if (_curr_future.has_value() && _curr_future.value().valid()) {
-		return 0.05f;
+	// if active web connection, 100ms
+	if (_current_task_id.has_value()) {
+		return 0.1f;
 	} else {
 		return 1.f;
 	}

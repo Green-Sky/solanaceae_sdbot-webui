@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
 
 add_library(solanaceae_sdbot-webui STATIC
+	./webapi_interface.hpp
+	./webapi_sdcpp_stduhpf_wip2.hpp
+	./webapi_sdcpp_stduhpf_wip2.cpp
+
 	./sd_bot.hpp
 	./sd_bot.cpp
 )

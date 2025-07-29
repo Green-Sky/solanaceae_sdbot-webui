@@ -14,7 +14,7 @@ jobs:
   linux-ubuntu:
     timeout-minutes: 10
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: ${{ github.event.repository.name }}-ubuntu20.04-x86_64
+        name: ${{ github.event.repository.name }}-ubuntu24.04-x86_64
         # TODO: do propper packing
         path: |
           ${{github.workspace}}/build/bin/
