@@ -57,7 +57,7 @@ SDBot::SDBot(
 	if (!_conf.has_int("SDBot", "steps")) {
 		_conf.set("SDBot", "steps", int64_t(20));
 	}
-	if (!_conf.has_double("SDBot", "cfg_scale")) {
+	if (!_conf.has_double("SDBot", "cfg_scale") && !_conf.has_int("SDBot", "cfg_scale")) {
 		_conf.set("SDBot", "cfg_scale", 6.5);
 	}
 
