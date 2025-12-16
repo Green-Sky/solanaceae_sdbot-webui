@@ -7,10 +7,10 @@
 #include <solanaceae/message3/components.hpp>
 
 #include "./webapi_sdcpp_stduhpf_wip2.hpp"
+#include "./webapi_sdcpp_openai.hpp"
 
 #include <fstream>
 #include <filesystem>
-#include <chrono>
 
 #include <iostream>
 #include <stdexcept>
@@ -24,7 +24,7 @@ SDBot::SDBot(
 	_rng.discard(3137);
 
 	if (!_conf.has_string("SDBot", "endpoint_type")) {
-		_conf.set("SDBot", "endpoint_type", std::string_view{"sdcpp_stduhpf_wip2"}); // default
+		_conf.set("SDBot", "endpoint_type", std::string_view{"sdcpp_openai"}); // default
 	}
 
 	//HACKy
@@ -32,6 +32,8 @@ SDBot::SDBot(
 		const std::string_view endpoint_type = _conf.get_string("SDBot", "endpoint_type").value();
 		if (endpoint_type == "sdcpp_stduhpf_wip2") {
 			_endpoint = std::make_unique<WebAPI_sdcpp_stduhpf_wip2>(_conf);
+		} else if (endpoint_type == "sdcpp_openai") {
+			_endpoint = std::make_unique<WebAPI_sdcpp_openai>(_conf);
 		} else {
 			throw std::runtime_error("missing endpoint type in config, cant continue!");
 		}
@@ -42,23 +44,12 @@ SDBot::SDBot(
 	if (!_conf.has_string("SDBot", "server_host")) {
 		_conf.set("SDBot", "server_host", std::string_view{"127.0.0.1"});
 	}
-	if (!_conf.has_int("SDBot", "server_port")) {
-		_conf.set("SDBot", "server_port", int64_t(7860)); // automatic11 default
-	}
-	if (!_conf.has_string("SDBot", "url_txt2img")) {
-		_conf.set("SDBot", "url_txt2img", std::string_view{"/sdapi/v1/txt2img"}); // automatic11 default
-	}
+
 	if (!_conf.has_int("SDBot", "width")) {
 		_conf.set("SDBot", "width", int64_t(512));
 	}
 	if (!_conf.has_int("SDBot", "height")) {
 		_conf.set("SDBot", "height", int64_t(512));
-	}
-	if (!_conf.has_int("SDBot", "steps")) {
-		_conf.set("SDBot", "steps", int64_t(20));
-	}
-	if (!_conf.has_double("SDBot", "cfg_scale") && !_conf.has_int("SDBot", "cfg_scale")) {
-		_conf.set("SDBot", "cfg_scale", 6.5);
 	}
 
 	_rmm_sr.subscribe(RegistryMessageModel_Event::message_construct);

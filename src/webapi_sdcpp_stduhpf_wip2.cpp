@@ -11,8 +11,8 @@
 
 std::shared_ptr<httplib::Client> WebAPI_sdcpp_stduhpf_wip2::getCl(void) {
 	if (_cl == nullptr) {
-		const std::string server_host {_conf.get_string("SDBot", "server_host").value()};
-		_cl = std::make_shared<httplib::Client>(server_host, _conf.get_int("SDBot", "server_port").value());
+		const std::string server_host {_conf.get_string("SDBot", "server_host").value_or("127.0.0.1")};
+		_cl = std::make_shared<httplib::Client>(server_host, _conf.get_int("SDBot", "server_port").value_or(8080));
 		_cl->set_read_timeout(std::chrono::minutes(2)); // because of discarding futures, it can block main for a while
 	}
 
@@ -22,6 +22,9 @@ std::shared_ptr<httplib::Client> WebAPI_sdcpp_stduhpf_wip2::getCl(void) {
 WebAPI_sdcpp_stduhpf_wip2::WebAPI_sdcpp_stduhpf_wip2(ConfigModelI& conf) :
 	_conf(conf)
 {
+	if (!_conf.has_int("SDBot", "server_port")) {
+		_conf.set("SDBot", "server_port", int64_t(8080));
+	}
 }
 
 WebAPI_sdcpp_stduhpf_wip2::~WebAPI_sdcpp_stduhpf_wip2(void) {
@@ -67,9 +70,7 @@ std::shared_ptr<WebAPITaskI> WebAPI_sdcpp_stduhpf_wip2::txt2img(
 	//  "vae_tiling": true,
 	//  "tae_decode": true
 	//}
-	//j_body["width"] = _conf.get_int("SDBot", "width").value_or(512);
 	j_body["width"] = width;
-	//j_body["height"] = _conf.get_int("SDBot", "height").value_or(512);
 	j_body["height"] = height;
 
 	j_body["prompt"] = std::string{_conf.get_string("SDBot", "prompt_prefix").value_or("")} + std::string{prompt};
@@ -92,7 +93,7 @@ std::shared_ptr<WebAPITaskI> WebAPI_sdcpp_stduhpf_wip2::txt2img(
 			return nullptr;
 		}
 
-		std::cerr << "SDB http complete " << res->status << " " << res->reason << "\n";
+		std::cerr << "SDB: http complete " << res->status << " " << res->reason << "\n";
 
 		if (
 			res.error() != httplib::Error::Success ||
